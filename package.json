@@ -25,6 +25,7 @@
     "hubot-hipchat": "~2.5.1-5",
     "cheerio": ">= 0.12.3",
     "htmlparser": ">= 1.7.6",
+    "jquery": ">= 1.8.3",
     "jsdom": ">= 0.8.8",
     "soupselect": ">= 0.2.0",
     "underscore": ">= 1.5.2",
