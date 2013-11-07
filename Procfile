@@ -1,1 +1,1 @@
-web: bin/hubot -a hipchat -n @nubot
+web: bin/hubot -a hipchat -n Nubot
