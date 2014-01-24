@@ -13,11 +13,11 @@ capitaliseFirstLetter = (string) ->
   return string.charAt(0).toUpperCase() + string.slice(1);
 
 module.exports = (robot) ->
-  robot.respond /fight m[ey] ([A-Za-z]+) against ([A-Za-z]+)/i, (msg) ->
-    fightMe msg, msg.match[1], msg.match[2], (resp) ->
+  robot.respond /fight m[ey] ([A-Za-z]+) against (@[A-Za-z0-9]+)?('s )?([A-Za-z]+)/i, (msg) ->
+    fightMe msg, msg.match[1], msg.match[4], msg.match[2], (resp) ->
       msg.send resp
 
-fightMe = (msg, pokemon1, pokemon2, cb) ->
+fightMe = (msg, pokemon1, pokemon2, opponent, cb) ->
   poke1 = (item for item in pokemons when item.name is capitaliseFirstLetter(pokemon1))[0]
   poke2 = (item for item in pokemons when item.name is capitaliseFirstLetter(pokemon2))[0]
   statTotal1 = +poke1.stats.hp + +poke1.stats.attack + +poke1.stats.defense + +poke1.stats.spattack + +poke1.stats.spdefense + +poke1.stats.speed
@@ -32,10 +32,13 @@ fightMe = (msg, pokemon1, pokemon2, cb) ->
   total2 = (statTotal2 * multiplier2) * (Math.random() * 0.2 + 0.9)
   total1 = total1.toFixed(1)
   total2 = total2.toFixed(1)
+  opponentStr = "your opponent"
+  if(opponent)
+    opponentStr = opponent
   if(+total1 > +total2)
-    cb ("The winner is your " + poke1.name + ", with a total of " + total1 + " points against " + poke2.name + "'s total of " + total2 + " points!")
+    cb ("The winner is your " + poke1.name + ", with a total of " + total1 + " points against " + opponentStr + " pokemon " + poke2.name + "'s total of " + total2 + " points!")
   else if(+total2 > +total1)
-    cb ("The winner is your opponent's " + poke2.name + ", with a total of " + total2 + " points against " + poke1.name + "'s total of " + total1 + " points!")
+    cb ("The winner is " + opponentStr + "'s " + poke2.name + ", with a total of " + total2 + " points against " + poke1.name + "'s total of " + total1 + " points!")
   else
     cb ("Both pokémon tied at " + total1 + " points!")
 
