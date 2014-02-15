@@ -15,7 +15,7 @@ module.exports = (robot) ->
     pkmn1 = new Pokemon msg.match[4], msg.match[3]
     pkmn2 = new Pokemon msg.match[7], msg.match[6] ? "the foe"
     battle = new Battle(pkmn1, pkmn2)
-    battle.start (str) -> msg.send str
+    msg.send battle.start()
   
   robot.respond /build me ([A-Za-z .]+)/i, (msg) ->
     pkmn = new Pokemon msg.match[1]
@@ -102,7 +102,8 @@ class Pokemon
 class Battle
   constructor: (@pkmn1, @pkmn2) ->
   
-  start: (send) ->
+  start: ->
+    log = ""
     winner = null
     until winner?
       move1 = this.chooseMove @pkmn1, @pkmn2
@@ -122,9 +123,8 @@ class Battle
         defenderMove = move1
       
       semiturns = 0
-      messages = []
       until semiturns == 2 or winner?
-        messages.push(upperFirst attackerPokemon.trainerAndName() + " used " + titleCase(attackerMove.name) + "!")
+        messages = [upperFirst attackerPokemon.trainerAndName() + " used " + titleCase(attackerMove.name) + "!"]
         if Math.random() * 100 > attackerMove.accuracy
           messages.push(upperFirst attackerPokemon.trainerAndName() + "'s attack missed!")
 
@@ -148,14 +148,15 @@ class Battle
               messages.push(upperFirst defenderPokemon.trainerAndName() + " fained!")
               winner = attackerPokemon
         
-        messages.push("")
+        log += messages.join("\n") + "\n\n";
         [attackerPokemon, defenderPokemon] = [defenderPokemon, attackerPokemon]
         [attackerMove, defenderMove] = [defenderMove, attackerMove]
         semiturns++
-        
-      send messages.join("\n")
-  
-    send "The winner is " + winner.trainerAndName() + " with " + winner.hp + " HP (" + Math.round(winner.hp / winner.maxHp * 100) + "%) remaining!"
+    
+      log += "\n";
+      
+    log += "The winner is " + winner.trainerAndName() + " with " + winner.hp + " HP (" + Math.round(winner.hp / winner.maxHp * 100) + "%) remaining!"
+    return log
     
   chooseMove: (attacker, defender) ->
     #TODO Struggle
