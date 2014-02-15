@@ -15,7 +15,7 @@ module.exports = (robot) ->
     pkmn1 = new Pokemon msg.match[4], msg.match[3]
     pkmn2 = new Pokemon msg.match[7], msg.match[6] ? "the foe"
     battle = new Battle(pkmn1, pkmn2)
-    msg.send battle.start()
+    battle.start (str) -> msg.send str
   
   robot.respond /build me ([A-Za-z .]+)/i, (msg) ->
     pkmn = new Pokemon msg.match[1]
@@ -34,17 +34,6 @@ module.exports = (robot) ->
         msg.send "No pokemon named " + name + "." + (if suggestions.length > 0 then " Did you mean " + suggestions + '?' else '')
       else
         msg.send err
-
-
-
-fightMe = (msg, pokemon1, pokemon2, opponent) ->
-  pkmn = new Pokemon pokemon1
-  msg.send "Pokemon loaded"
-  for move in pkmn.moves
-    msg.send move.name + ": " + move.score
-  
-  msg.send pkmn.hello()
-
 
 
 # Assumes lv. 100 and all IVs at 31. Ignores EV and nature.
@@ -113,8 +102,7 @@ class Pokemon
 class Battle
   constructor: (@pkmn1, @pkmn2) ->
   
-  start: ->
-    log = ""
+  start: (send) ->
     winner = null
     until winner?
       move1 = this.chooseMove @pkmn1, @pkmn2
@@ -134,9 +122,10 @@ class Battle
         defenderMove = move1
       
       semiturns = 0
+      messages = []
       until semiturns == 2 or winner?
-        messages = [upperFirst attackerPokemon.trainerAndName() + " used " + titleCase(attackerMove.name) + "!"]
-        if Math.random * 100 > attackerMove.accuracy
+        messages.push(upperFirst attackerPokemon.trainerAndName() + " used " + titleCase(attackerMove.name) + "!")
+        if Math.random() * 100 > attackerMove.accuracy
           messages.push(upperFirst attackerPokemon.trainerAndName() + "'s attack missed!")
 
         else
@@ -159,13 +148,14 @@ class Battle
               messages.push(upperFirst defenderPokemon.trainerAndName() + " fained!")
               winner = attackerPokemon
         
-        log += messages.join("\n") + "\n\n";
+        messages.push("")
         [attackerPokemon, defenderPokemon] = [defenderPokemon, attackerPokemon]
         [attackerMove, defenderMove] = [defenderMove, attackerMove]
         semiturns++
+        
+      send messages.join("\n")
   
-    log += "The winner is " + winner.trainerAndName() + " with " + winner.hp + " HP (" + Math.round(winner.hp / winner.maxHp * 100) + "%) remaining!"
-    return log
+    send "The winner is " + winner.trainerAndName() + " with " + winner.hp + " HP (" + Math.round(winner.hp / winner.maxHp * 100) + "%) remaining!"
     
   chooseMove: (attacker, defender) ->
     #TODO Struggle
