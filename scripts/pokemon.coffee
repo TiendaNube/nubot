@@ -74,7 +74,7 @@ class Pokemon
       
       continue if move.damage_class_id not in [2,3]
       # Effects that cause the move to take several turns or are otherwise problematic
-      continue if move.effect_id in [8, 9, 27, 28, 39, 40, 76, 81, 146, 149, 152, 156, 159, 160, 191, 205, 230, 247, 249, 256, 257, 273, 312, 332, 333]
+      continue if move.effect_id in [8, 9, 27, 28, 39, 40, 76, 81, 146, 149, 152, 156, 159, 160, 191, 205, 230, 247, 249, 256, 257, 273, 293, 298, 312, 332, 333]
       
       # Effects that could be implemented more easily, such as multi-hit attacks or recoil
       continue if move.effect_id in [30, 45, 46, 49, 78, 199, 254, 255, 263, 270]
