@@ -141,31 +141,46 @@ class Move
     @damageClass = move.damage_class_id
   
   blacklisted: -> 
-    #TODO Last 4 could be implemented more easily.
-    blacklist = [8, 9, 27, 28, 39, 40, 76, 81, 105, 136, 146, 149, 152, 156, 159, 160, 191, 205, 230, 247, 249, 256, 257, 273, 293, 298, 312, 332, 333, 30, 45, 46, 78]
+    blacklist = [8, 9, 27, 28, 39, 40, 76, 81, 105, 136, 146, 149, 152, 156, 159, 160, 171, 191, 205, 230, 247, 249, 256, 257, 273, 293, 298, 312, 332, 333, 46]
     return @damageClass == @constructor.DAMAGE_NONE or @effect in blacklist or @power < 2
   
   scoreModifier: ->
     base = switch @effect
       # Heal
       when 4 then 1.25
+      
       # Recoil
       when 49, 199, 254, 263 then 0.85
       when 270 then 0.5
+      
+      # Multi-hit
+      when 30 then 3.166
+      when 45, 78 then 2
+      
       else 1
     
     base *= 1.33 if @priority > 0
+    base *= 0.9 if @priority < 0
+    
     return base
   
   chooseModifier: (attacker, defender, damage) ->
+    kill = damage >= defender.hp
+  
     base = @accuracy / 100
     base *= 1 - this.recoil(damage) / attacker.hp / 1.5
     
     if attacker.hp < attacker.maxHp
       base *= 1 + this.heal(damage) / (attacker.maxHp - attacker.hp) / 1.5
     
-    if @priority > 0 and damage >= defender.hp
+    if @priority > 0 and kill
       base *= 5
+    
+    if not kill  
+      switch @effect
+        # Multi-hit
+        when 30 then base *= 3.166
+        when 45, 78 then base *= 2
     
     return base
   
@@ -178,6 +193,12 @@ class Move
       
   heal: (damage) ->
     if @effect == 4 then damage / 2 else 0
+    
+  hits: (damage) ->
+    switch @effect
+      when 30 then [2,2,3,3,4,5][Math.floor(Math.random() * 6)]
+      when 45, 78 then 2
+      else 1
   
   afterDamage: (attacker, defender, damage, messages) ->
     switch @effect
@@ -232,30 +253,33 @@ class Battle
           messages.push(upperFirst attackerPokemon.trainerAndName() + "'s attack missed!")
 
         else
-          critical = Math.random() < 0.0625
-          random = Math.random() * (1 - 0.85) + 0.85
-          damage = this.calculateDamage attackerMove, attackerPokemon, defenderPokemon, critical, random
-          
-          if damage == 0
+          effectiveness = +defenderPokemon.multipliers[attackerMove.type.toLowerCase()]
+          if effectiveness == 0
             messages.push("It has no effect!")
           else
-            damage = defenderPokemon.hp if damage > defenderPokemon.hp
+            hits = attackerMove.hits()
+            hit = 0
             
-            effectiveness = defenderPokemon.multipliers[attackerMove.type.toLowerCase()]
-            messages.push("It's a critical hit!") if critical
-            messages.push("It's super effective!") if effectiveness > 1
-            messages.push("It's not very effective...") if effectiveness < 1
-            messages.push(upperFirst defenderPokemon.trainerAndName() + " is hit for " + damage + " HP (" + Math.round(damage / defenderPokemon.maxHp * 100) + "%)")
-            
-            defenderPokemon.hp -= damage
-            if (defenderPokemon.hp <= 0)
-              messages.push(upperFirst defenderPokemon.trainerAndName() + " fained!")
-              winner = attackerPokemon
+            until hit++ == hits or winner?
+              critical = Math.random() < 0.0625
+              random = Math.random() * (1 - 0.85) + 0.85
+              damage = this.calculateDamage attackerMove, attackerPokemon, defenderPokemon, critical, random
+              damage = defenderPokemon.hp if damage > defenderPokemon.hp
               
-            attackerMove.afterDamage attackerPokemon, defenderPokemon, damage, messages
-            if (attackerPokemon.hp <= 0)
-              messages.push(upperFirst attackerPokemon.trainerAndName() + " fained!")
-              winner = defenderPokemon unless winner?
+              messages.push("It's a critical hit!") if critical
+              messages.push("It's super effective!") if effectiveness > 1
+              messages.push("It's not very effective...") if effectiveness < 1
+              messages.push(upperFirst defenderPokemon.trainerAndName() + " is hit for " + damage + " HP (" + Math.round(damage / defenderPokemon.maxHp * 100) + "%)")
+              
+              defenderPokemon.hp -= damage
+              if (defenderPokemon.hp <= 0)
+                messages.push(upperFirst defenderPokemon.trainerAndName() + " fained!")
+                winner = attackerPokemon
+                
+              attackerMove.afterDamage attackerPokemon, defenderPokemon, damage, messages
+              if (attackerPokemon.hp <= 0)
+                messages.push(upperFirst attackerPokemon.trainerAndName() + " fained!")
+                winner = defenderPokemon unless winner?
         
         log += messages.join("\n") + "\n\n";
         [attackerPokemon, defenderPokemon] = [defenderPokemon, attackerPokemon]
