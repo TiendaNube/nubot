@@ -140,7 +140,7 @@ class Move
     @damageClass = move.damage_class_id
   
   blacklisted: -> 
-    #TODO Last 4 could be implemented more easily. Another easy effect would be Giga Drain's
+    #TODO Last 4 could be implemented more easily.
     blacklist = [8, 9, 27, 28, 39, 40, 76, 81, 136, 146, 149, 152, 156, 159, 160, 191, 205, 230, 247, 249, 256, 257, 273, 293, 298, 312, 332, 333, 30, 45, 46, 78]
     return @damageClass == @constructor.DAMAGE_NONE or @effect in blacklist or @power < 2
   
