@@ -11,6 +11,7 @@ fs = require 'fs'
 # Source: https://github.com/veekun/pokedex
 pokemons = JSON.parse fs.readFileSync('pokemonjson/pokemon.json').toString()
 movedex = JSON.parse fs.readFileSync('pokemonjson/moves.json').toString()
+defensedex = JSON.parse fs.readFileSync('pokemonjson/types_defense.json').toString()
 
 module.exports = (robot) ->
   robot.respond /fight (m[ey] )?((@[A-Za-z0-9]+)'s )?([A-Za-z .']+) against ((@[A-Za-z0-9]+)'s )?([A-Za-z .']+)/i, (msg) ->
@@ -24,6 +25,14 @@ module.exports = (robot) ->
     moves = []
     for move in pkmn.moves
       moves.push(move.name)
+      
+    msg.send moves.join("\n")
+    
+  robot.respond /build debug me ([A-Za-z .]+)/i, (msg) ->
+    pkmn = new Pokemon msg.match[1]
+    moves = []
+    for move in pkmn.movesDebug
+      moves.push(move.name + " (" + move.type + ") " + move.score)
       
     msg.send moves.join("\n")
   
@@ -60,6 +69,7 @@ class Pokemon
     @speed = this.statFormula pokedex.stats.speed
     
     @hp = @maxHp
+    @helpfulTypes = this.calculateHelpfulTypes()
     @moves = this.chooseMoves pokedex.moves
   
   trainerAndName: ->
@@ -69,6 +79,14 @@ class Pokemon
       return @trainer + "'s " + @name
     
   statFormula: (base) -> 36 + 2 * base
+  
+  calculateHelpfulTypes: ->
+    weaknesses = (type for type, effectiveness of @multipliers when effectiveness > 1)
+    helpfulTypes = []
+    for weakness in weaknesses
+      helpfulTypes = helpfulTypes.concat (type for type, effectiveness of defensedex[weakness] when effectiveness > 1)
+      
+    return helpfulTypes
   
   chooseMoves: (pokedex) ->
     allMoves = pokedex.level.concat(pokedex.tmhm).concat(pokedex.egg).concat(pokedex.tutor)
@@ -81,15 +99,19 @@ class Pokemon
       
       continue if move.blacklisted()
       
+      if move.type in @types
+        typeMultiplier = 1.5
+      else
+        typeMultiplier = if move.type.toLowerCase() in @helpfulTypes then 1.1 else 1
+      
       stat = if move.damageClass == Move.DAMAGE_PHYSICAL then @attack else @spattack
-      stab = if move.type in @types then 1.5 else 1
       effect = move.priorityModifier()
       
-      #TODO Add a multiplier for useful types (effective against pokemon's weak types)
-      move.score = move.power * stab * stat * move.accuracy * effect
+      move.score = move.power * typeMultiplier * stat * move.accuracy * effect
       moves.push(move)
     
     moves.sort (a,b) -> b.score - a.score
+    @movesDebug = moves
     
     result = []
     typesCovered = []
@@ -212,7 +234,7 @@ class Battle
     
   chooseMove: (attacker, defender) ->
     bestMove = null
-    bestDamage = 0
+    bestDamage = -1
     for move in attacker.moves
       damage = this.calculateDamage move, attacker, defender
       if damage > bestDamage
