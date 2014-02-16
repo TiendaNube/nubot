@@ -136,6 +136,7 @@ class Move
     @type = move.type
     @power = move.power
     @accuracy = move.accuracy ? 100
+    @priority = move.priority
     @effect = move.effect_id
     @damageClass = move.damage_class_id
   
@@ -144,13 +145,17 @@ class Move
     blacklist = [8, 9, 27, 28, 39, 40, 76, 81, 136, 146, 149, 152, 156, 159, 160, 191, 205, 230, 247, 249, 256, 257, 273, 293, 298, 312, 332, 333, 30, 45, 46, 78]
     return @damageClass == @constructor.DAMAGE_NONE or @effect in blacklist or @power < 2
   
-  scoreModifier: -> switch @effect
+  scoreModifier: ->
+    base = switch @effect
       # Heal
       when 4 then 1.25
       # Recoil
       when 49, 199, 254, 263 then 0.85
       when 270 then 0.5
       else 1
+    
+    base *= 1.33 if @priority > 0
+    return base
   
   chooseModifier: (attacker, defender, damage) ->
     base = @accuracy / 100
@@ -158,7 +163,10 @@ class Move
     
     if attacker.hp < attacker.maxHp
       base *= 1 + this.heal(damage) / (attacker.maxHp - attacker.hp) / 1.5
-      
+    
+    if @priority > 0 and damage >= defender.hp
+      base *= 5
+    
     return base
   
   recoil: (damage) ->
@@ -201,8 +209,12 @@ class Battle
       move2 = this.chooseMove @pkmn2, @pkmn1
       throw new Error("One of the pokemon doesn't have an attack move.") unless move1? and move2?
       
-      #TODO Move priorities
-      if @pkmn1.speed > @pkmn2.speed or (@pkmn1.speed == @pkmn2.speed and Math.random() > 0.5)
+      if move1.priority == move2.priority
+        pkmn1GoesFirst = @pkmn1.speed > @pkmn2.speed or (@pkmn1.speed == @pkmn2.speed and Math.random() > 0.5)
+      else
+        pkmn1GoesFirst = move1.priority > move2.priority
+      
+      if (pkmn1GoesFirst)
         attackerPokemon = @pkmn1
         attackerMove = move1
         defenderPokemon = @pkmn2
