@@ -2,7 +2,9 @@
 #   Pokémon battles!
 #
 # Commands:
-#   hubot fight me <pokemon> against <pokemon> - Makes the two pokemon fight each other. The winner is decided on type matches, total stat values, and a bit of randomness.
+#   hubot fight [me] [@user's] <pokemon> against [@user's] <pokemon> - Simulates a pokemon battle.
+#   hubot build me <pokemon> - Show the moves chosen for a given pokemon
+#   hubot bulbapedia me <query> - Searches Bulbapedia for the given query
 
 fs = require 'fs'
 
@@ -24,6 +26,9 @@ module.exports = (robot) ->
       moves.push(titleCase(move.name))
       
     msg.send moves.join("\n")
+  
+  robot.respond /bulbapedia me (.+)/i, (msg) ->
+    msg.send 'http://bulbapedia.bulbagarden.net/w/index.php?search=' + msg.match[1]
   
   robot.error (err, msg) ->
     if msg?
