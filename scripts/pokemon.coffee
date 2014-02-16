@@ -23,7 +23,7 @@ module.exports = (robot) ->
     pkmn = new Pokemon msg.match[1]
     moves = []
     for move in pkmn.moves
-      moves.push(titleCase(move.name))
+      moves.push(move.name)
       
     msg.send moves.join("\n")
   
@@ -74,21 +74,19 @@ class Pokemon
     allMoves = pokedex.level.concat(pokedex.tmhm).concat(pokedex.egg).concat(pokedex.tutor)
     moves = []
     for movePointer in allMoves
-      move = (item for item in movedex when item.name is movePointer.name)[0]
-      continue unless move?
+      try
+        move = new Move movePointer.name
+      catch err
+        continue
       
-      continue if move.damage_class_id not in [2,3]
-      # Effects that cause the move to take several turns or are otherwise problematic
-      continue if move.effect_id in [8, 9, 27, 28, 39, 40, 76, 81, 146, 149, 152, 156, 159, 160, 191, 205, 230, 247, 249, 256, 257, 273, 293, 298, 312, 332, 333]
+      continue if move.blacklisted()
       
-      # Effects that could be implemented more easily, such as multi-hit attacks or recoil
-      continue if move.effect_id in [30, 45, 46, 49, 78, 199, 254, 255, 263, 270]
-      
-      stat = if move.damage_class_id == 2 then @attack else @spattack
+      stat = if move.damageClass == Move.DAMAGE_PHYSICAL then @attack else @spattack
       stab = if move.type in @types then 1.5 else 1
+      effect = move.priorityModifier()
       
       #TODO Add a multiplier for useful types (effective against pokemon's weak types)
-      move.score = move.power * stab * stat * move.accuracy
+      move.score = move.power * stab * stat * move.accuracy * effect
       moves.push(move)
     
     moves.sort (a,b) -> b.score - a.score
@@ -101,8 +99,50 @@ class Pokemon
         typesCovered.push(move.type)
         break if typesCovered.length == 4
     
+    if result.length == 0
+      result = [ new Move('struggle') ]
+    
     return result
-        
+
+
+class Move
+  @DAMAGE_NONE = 1
+  @DAMAGE_PHYSICAL = 2
+  @DAMAGE_SPECIAL = 3
+  
+  constructor: (name) ->
+    move = (item for item in movedex when item.name is name)[0]
+    throw new Error("MoveNotFound:" + name) unless move?
+    
+    @name = titleCase move.name
+    @type = move.type
+    @power = move.power
+    @accuracy = move.accuracy ? 100
+    @effect = move.effect_id
+    @damageClass = move.damage_class_id
+  
+  blacklisted: -> 
+    #TODO Last 4 could be implemented more easily. Another easy effect would be Giga Drain's
+    blacklist = [8, 9, 27, 28, 39, 40, 76, 81, 146, 149, 152, 156, 159, 160, 191, 205, 230, 247, 249, 256, 257, 273, 293, 298, 312, 332, 333, 30, 45, 46, 78]
+    return @damageClass == @constructor.DAMAGE_NONE or @effect in blacklist
+  
+  priorityModifier: -> switch @effect
+      # Recoil
+      when 49, 199, 254, 263 then 0.85
+      when 270 then 0.5
+      else 1
+  
+  afterDamage: (attacker, defender, damage, messages) ->
+    switch @effect
+      when 49 then selfDamage = damage / 4
+      when 199, 254, 263 then selfDamage = damage / 3
+      when 270 then selfDamage = damage / 2
+      when 255 then selfDamage = attacker.maxHp / 4
+    
+    if selfDamage?
+      selfDamage = Math.round(selfDamage)
+      attacker.hp -= selfDamage
+      messages.push(upperFirst attacker.trainerAndName() + " is hurt " +  selfDamage + " HP (" + Math.round(selfDamage / attacker.maxHp * 100) + "%) by recoil!")
 
 class Battle
   constructor: (@pkmn1, @pkmn2) ->
@@ -113,7 +153,7 @@ class Battle
     until winner?
       move1 = this.chooseMove @pkmn1, @pkmn2
       move2 = this.chooseMove @pkmn2, @pkmn1
-      throw new Error("Neither pokemon has an attack move.") unless move1? and move2?
+      throw new Error("One of the pokemon doesn't have an attack move.") unless move1? and move2?
       
       #TODO Move priorities
       if @pkmn1.speed > @pkmn2.speed or (@pkmn1.speed == @pkmn2.speed and Math.random() > 0.5)
@@ -129,7 +169,7 @@ class Battle
       
       semiturns = 0
       until semiturns == 2 or winner?
-        messages = [upperFirst attackerPokemon.trainerAndName() + " used " + titleCase(attackerMove.name) + "!"]
+        messages = [upperFirst attackerPokemon.trainerAndName() + " used " + attackerMove.name + "!"]
         if Math.random() * 100 > attackerMove.accuracy
           messages.push(upperFirst attackerPokemon.trainerAndName() + "'s attack missed!")
 
@@ -141,17 +181,23 @@ class Battle
           if damage == 0
             messages.push("It has no effect!")
           else
+            damage = defenderPokemon.hp if damage > defenderPokemon.hp
+            
             effectiveness = defenderPokemon.multipliers[attackerMove.type.toLowerCase()]
             messages.push("It's a critical hit!") if critical
             messages.push("It's super effective!") if effectiveness > 1
             messages.push("It's not very effective...") if effectiveness < 1
             messages.push(upperFirst defenderPokemon.trainerAndName() + " is hit for " + damage + " HP (" + Math.round(damage / defenderPokemon.maxHp * 100) + "%)")
             
-            
             defenderPokemon.hp -= damage
             if (defenderPokemon.hp <= 0)
               messages.push(upperFirst defenderPokemon.trainerAndName() + " fained!")
               winner = attackerPokemon
+              
+            attackerMove.afterDamage attackerPokemon, defenderPokemon, damage, messages
+            if (attackerPokemon.hp <= 0)
+              messages.push(upperFirst attackerPokemon.trainerAndName() + " fained!")
+              winner = defenderPokemon unless winner?
         
         log += messages.join("\n") + "\n\n";
         [attackerPokemon, defenderPokemon] = [defenderPokemon, attackerPokemon]
@@ -159,12 +205,12 @@ class Battle
         semiturns++
     
       log += "\n";
-      
+    
+    winner.hp = 0 if winner.hp < 0  
     log += "The winner is " + winner.trainerAndName() + " with " + winner.hp + " HP (" + Math.round(winner.hp / winner.maxHp * 100) + "%) remaining!"
     return log
     
   chooseMove: (attacker, defender) ->
-    #TODO Struggle
     bestMove = null
     bestDamage = 0
     for move in attacker.moves
@@ -172,12 +218,12 @@ class Battle
       if damage > bestDamage
         bestMove = move
         bestDamage = damage
-        
+    
     return bestMove
   
   calculateDamage: (move, attacker, defender, critical=false, random=0.925) ->
-    attack = if move.damage_class_id == 2 then attacker.attack else attacker.spattack
-    defense = if move.damage_class_id == 2 then defender.defense else defender.spdefense
+    attack = if move.damageClass == Move.DAMAGE_PHYSICAL then attacker.attack else attacker.spattack
+    defense = if move.damageClass == Move.DAMAGE_PHYSICAL then defender.defense else defender.spdefense
     
     stab = if move.type in attacker.types then 1.5 else 1
     type = defender.multipliers[move.type.toLowerCase()]
