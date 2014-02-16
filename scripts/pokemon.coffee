@@ -24,7 +24,7 @@ module.exports = (robot) ->
     pkmn = new Pokemon msg.match[1]
     moves = []
     for move in pkmn.moves
-      moves.push(move.name)
+      moves.push(move.name + " (" + move.type + " - " + move.power + " power) ")
       
     msg.send moves.join("\n")
     
@@ -105,7 +105,7 @@ class Pokemon
         typeMultiplier = if move.type.toLowerCase() in @helpfulTypes then 1.1 else 1
       
       stat = if move.damageClass == Move.DAMAGE_PHYSICAL then @attack else @spattack
-      effect = move.priorityModifier()
+      effect = move.scoreModifier()
       
       move.score = move.power * typeMultiplier * stat * move.accuracy * effect
       moves.push(move)
@@ -148,17 +148,30 @@ class Move
     blacklist = [8, 9, 27, 28, 39, 40, 76, 81, 136, 146, 149, 152, 156, 159, 160, 191, 205, 230, 247, 249, 256, 257, 273, 293, 298, 312, 332, 333, 30, 45, 46, 78]
     return @damageClass == @constructor.DAMAGE_NONE or @effect in blacklist
   
-  priorityModifier: -> switch @effect
+  scoreModifier: -> switch @effect
       # Recoil
       when 49, 199, 254, 263 then 0.85
       when 270 then 0.5
       else 1
   
+  chooseModifier: (attacker, defender, damage) ->
+    base = @accuracy / 100
+    realDamage = if defender.hp < damage then defender.hp else damage
+    
+    base *= 1 - this.recoil(realDamage) / attacker.hp / 1.5
+      
+    return base
+  
+  recoil: (damage) ->
+    switch @effect
+      when 49 then damage / 4
+      when 199, 254, 263 then damage / 3
+      when 270 then damage / 2
+      else 0
+  
   afterDamage: (attacker, defender, damage, messages) ->
     switch @effect
-      when 49 then selfDamage = damage / 4
-      when 199, 254, 263 then selfDamage = damage / 3
-      when 270 then selfDamage = damage / 2
+      when 49, 199, 254, 263, 270 then selfDamage = this.recoil damage
       when 255 then selfDamage = attacker.maxHp / 4
     
     if selfDamage?
@@ -237,13 +250,15 @@ class Battle
     bestDamage = -1
     for move in attacker.moves
       damage = this.calculateDamage move, attacker, defender
+      damage *= move.chooseModifier attacker, defender, damage
+      
       if damage > bestDamage
         bestMove = move
         bestDamage = damage
     
     return bestMove
   
-  calculateDamage: (move, attacker, defender, critical=false, random=0.925) ->
+  calculateDamage: (move, attacker, defender, critical = false, random = 0.925) ->
     attack = if move.damageClass == Move.DAMAGE_PHYSICAL then attacker.attack else attacker.spattack
     defense = if move.damageClass == Move.DAMAGE_PHYSICAL then defender.defense else defender.spdefense
     
