@@ -22,17 +22,13 @@ module.exports = (robot) ->
   
   robot.respond /build me ([A-Za-z .]+)/i, (msg) ->
     pkmn = new Pokemon msg.match[1]
-    moves = []
-    for move in pkmn.moves
-      moves.push(move.name + " (" + move.type + " - " + move.power + " power) ")
-      
-    msg.send moves.join("\n")
+    msg.send pkmn.moves.join("\n")
     
   robot.respond /build debug me ([A-Za-z .]+)/i, (msg) ->
     pkmn = new Pokemon msg.match[1]
     moves = []
     for move in pkmn.movesDebug
-      moves.push(move.name + " (" + move.type + ") " + move.score)
+      moves.push(move + " " + move.score)
       
     msg.send moves.join("\n")
   
@@ -146,9 +142,11 @@ class Move
   blacklisted: -> 
     #TODO Last 4 could be implemented more easily. Another easy effect would be Giga Drain's
     blacklist = [8, 9, 27, 28, 39, 40, 76, 81, 136, 146, 149, 152, 156, 159, 160, 191, 205, 230, 247, 249, 256, 257, 273, 293, 298, 312, 332, 333, 30, 45, 46, 78]
-    return @damageClass == @constructor.DAMAGE_NONE or @effect in blacklist
+    return @damageClass == @constructor.DAMAGE_NONE or @effect in blacklist or @power < 2
   
   scoreModifier: -> switch @effect
+      # Heal
+      when 4 then 1.25
       # Recoil
       when 49, 199, 254, 263 then 0.85
       when 270 then 0.5
@@ -156,9 +154,10 @@ class Move
   
   chooseModifier: (attacker, defender, damage) ->
     base = @accuracy / 100
-    realDamage = if defender.hp < damage then defender.hp else damage
+    base *= 1 - this.recoil(damage) / attacker.hp / 1.5
     
-    base *= 1 - this.recoil(realDamage) / attacker.hp / 1.5
+    if attacker.hp < attacker.maxHp
+      base *= 1 + this.heal(damage) / (attacker.maxHp - attacker.hp) / 1.5
       
     return base
   
@@ -168,16 +167,28 @@ class Move
       when 199, 254, 263 then damage / 3
       when 270 then damage / 2
       else 0
+      
+  heal: (damage) ->
+    if @effect == 4 then damage / 2 else 0
   
   afterDamage: (attacker, defender, damage, messages) ->
     switch @effect
+      when 4 then selfHeal = this.heal damage
       when 49, 199, 254, 263, 270 then selfDamage = this.recoil damage
       when 255 then selfDamage = attacker.maxHp / 4
+    
+    if selfHeal? and attacker.hp < attacker.maxHp
+      selfHeal = Math.min(Math.round(selfHeal), attacker.maxHp - attacker.hp)
+      attacker.hp += selfHeal
+      messages.push(upperFirst attacker.trainerAndName() + " healed " +  selfHeal + " HP (" + Math.round(selfHeal / attacker.maxHp * 100) + "%)!")
     
     if selfDamage?
       selfDamage = Math.round(selfDamage)
       attacker.hp -= selfDamage
       messages.push(upperFirst attacker.trainerAndName() + " is hurt " +  selfDamage + " HP (" + Math.round(selfDamage / attacker.maxHp * 100) + "%) by recoil!")
+
+  toString: ->
+    return @name + " (" + @type + " - " + @power + " power)"
 
 class Battle
   constructor: (@pkmn1, @pkmn2) ->
@@ -250,6 +261,8 @@ class Battle
     bestDamage = -1
     for move in attacker.moves
       damage = this.calculateDamage move, attacker, defender
+      damage = defender.hp if defender.hp < damage 
+      
       damage *= move.chooseModifier attacker, defender, damage
       
       if damage > bestDamage
