@@ -33,7 +33,8 @@
     "underscore": ">= 1.5.2",
     "underscore.string": ">= 2.3.3",
     "validator": ">= 2.0.0",
-    "xml2js": ">= 0.2.8"
+    "xml2js": ">= 0.2.8",
+    "pokemon-battle": "< 2.0.0"
   },
   "engines": {
     "node": ">= 0.8.x",
