@@ -15,28 +15,44 @@ movedex = JSON.parse fs.readFileSync('pokemonjson/moves.json').toString()
 defensedex = JSON.parse fs.readFileSync('pokemonjson/types_defense.json').toString()
 
 module.exports = (robot) ->
-  robot.respond /fight (m[ey] )?((@[A-Za-z0-9]+)'s )?([A-Za-z .']+) against ((@[A-Za-z0-9]+)'s )?([A-Za-z .']+)/i, (msg) ->
-    id1 = pokemonFromName msg.match[4], msg
-    id2 = pokemonFromName msg.match[7], msg
-    return unless id1? and id2?
+  robot.respond /fight (?:m[ey] )?(?:(@[A-Za-z0-9]+)'s )?([A-Za-z .,'-]+) against (?:(@[A-Za-z0-9]+)'s )?([A-Za-z .,'-]+)/i, (msg) ->
+    error = false;
+    
+    pokemon1 = []
+    for pokeName in msg.match[2].split(',') when pokeName.length > 0
+      id = pokemonFromName pokeName.trim(), msg
+      if id?
+        pokemon1.push(id)
+      else
+        error = true
+    
+    pokemon2 = []
+    for pokeName in msg.match[4].split(',') when pokeName.length > 0
+      id = pokemonFromName pokeName.trim(), msg
+      if id?
+        pokemon2.push(id)
+      else
+        error = true
+    
+    return if error
     
     trainer1 = {
-      trainer: msg.match[3],
-      pokemon: id1,
+      trainer: msg.match[1],
+      pokemon: pokemon1,
     }
     
     trainer2 = {
-      trainer: msg.match[6],
-      pokemon: id2,
+      trainer: if msg.match[3]? then msg.match[3] else 'the foe',
+      pokemon: pokemon2,
     }
   
     msg.send pokemon.battle trainer1, trainer2
   
-  robot.respond /build me ([A-Za-z .]+)/i, (msg) ->
+  robot.respond /build me ([A-Za-z .-]+)/i, (msg) ->
     id = pokemonFromName msg.match[1], msg
     msg.send pokemon.build id if id?
     
-  robot.respond /build debug me ([A-Za-z .]+)/i, (msg) ->
+  robot.respond /build debug me ([A-Za-z .-]+)/i, (msg) ->
     id = pokemonFromName msg.match[1], msg
     msg.send pokemon.buildDebug id if id?
   
