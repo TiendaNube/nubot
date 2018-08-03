@@ -20,7 +20,7 @@
     "url": "https://github.com/github/hubot.git"
   },
   "dependencies": {
-    "hubot": ">= 2.6.0 < 3.0.0",
+    "hubot": ">=3.1.0",
     "hubot-scripts": ">= 2.5.0 < 3.0.0",
     "hubot-hipchat": "~2.12.0",
     "cheerio": ">= 0.12.3",
