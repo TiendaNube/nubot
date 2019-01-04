@@ -24,7 +24,7 @@
     "hubot-scripts": ">= 2.5.0 < 3.0.0",
     "hubot-hipchat": "~2.12.0",
     "cheerio": ">= 0.12.3",
-    "flip": ">= 0.1.0",
+    "flip": ">=1.0.0",
     "htmlparser": ">= 1.7.6",
     "jquery": ">= 1.8.3",
     "jsdom": ">= 0.8.8",
