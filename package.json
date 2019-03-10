@@ -27,7 +27,7 @@
     "flip": ">= 0.1.0",
     "htmlparser": ">= 1.7.6",
     "jquery": ">= 1.8.3",
-    "jsdom": ">= 0.8.8",
+    "jsdom": ">=14.0.0",
     "nodepie": ">= 0.6.2",
     "soupselect": ">= 0.2.0",
     "underscore": ">= 1.5.2",
