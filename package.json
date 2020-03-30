@@ -30,7 +30,7 @@
     "jsdom": ">= 0.8.8",
     "nodepie": ">= 0.6.2",
     "soupselect": ">= 0.2.0",
-    "underscore": ">= 1.5.2",
+    "underscore": ">=1.10.2",
     "underscore.string": ">= 2.3.3",
     "validator": ">= 2.0.0",
     "xml2js": ">= 0.2.8",
